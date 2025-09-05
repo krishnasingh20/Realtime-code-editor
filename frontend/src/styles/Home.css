@@ -1,0 +1,45 @@
+/* Container background */
+.home-container {
+  background-color: #201f1f; /* VS Code-like dark tone */
+  height: 100vh;
+}
+
+/* Custom input background */
+.bg-custom {
+  background-color: #201f1f !important;
+  color: #fff !important;
+  border: 1px solid #555 !important;
+}
+
+/* Placeholder styling */
+.form-control::placeholder {
+  color: rgba(255, 255, 255, 0.6) !important;
+  opacity: 1 !important;
+}
+
+/* Input focus effect */
+.form-control:focus {
+  border-color: rgb(28, 160, 28) !important;
+  box-shadow: 0 0 5px rgb(28, 160, 28) !important;
+  outline: none !important;
+}
+
+/* Hover effect for input */
+.form-control:hover {
+  border-color: rgb(28, 160, 28) !important;
+}
+
+/* Smooth transition */
+body,
+.home-container,
+.form-control {
+  transition: background-color 0.3s ease-in-out, border-color 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
+}
+
+.mt-3{
+  border: 2px solid rgb(28, 160, 28);
+  border-radius: 5px;
+}
+.text-muted{
+  color: white !important;
+}

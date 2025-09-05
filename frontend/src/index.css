@@ -1,0 +1,10 @@
+body {
+  background-color: #201f1f;
+  font-family: "Poppins", sans-serif;
+  margin: 0;
+  padding: 0;
+}
+
+.btn-link {
+  cursor: pointer;
+}

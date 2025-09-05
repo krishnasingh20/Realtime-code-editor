@@ -1,0 +1,78 @@
+.editor-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  padding: 10px;
+  background-color: #f7f7f7;
+  font-family: Arial, sans-serif;
+}
+
+/* Header */
+.editor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #007bff;
+  padding: 10px;
+  border-radius: 6px;
+  color: white;
+}
+
+/* Toolbar */
+.editor-toolbar {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  margin: 10px 0;
+  gap: 10px;
+}
+
+.language-selector {
+  padding: 5px;
+  font-size: 14px;
+}
+
+.run-btn {
+  background-color: #28a745;
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  cursor: pointer;
+  border-radius: 5px;
+  font-weight: bold;
+}
+
+.run-btn:disabled {
+  background-color: gray;
+  cursor: not-allowed;
+}
+
+/* Code Editor */
+.code-editor {
+  flex-grow: 1;
+  width: 100%;
+  font-family: monospace;
+  font-size: 15px;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background-color: #1e1e1e;
+  color: #ffffff;
+  resize: none;
+}
+
+/* Console Output */
+.console-container {
+  margin-top: 10px;
+  background-color: #282c34;
+  color: #ffffff;
+  padding: 10px;
+  border-radius: 6px;
+  height: 180px;
+  overflow-y: auto;
+}
+
+.console-output {
+  white-space: pre-wrap;
+  font-family: monospace;
+}
