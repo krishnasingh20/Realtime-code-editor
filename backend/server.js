@@ -3,6 +3,9 @@ import http from "http";
 import { Server } from "socket.io";
 import cors from "cors";
 import axios from "axios";
+import dotenv from "dotenv";
+dotenv.config();
+
 
 const app = express();
 const server = http.createServer(app);
@@ -98,10 +101,17 @@ return 0;
       }
 
       const response = await axios.post(
-        `https://${JUDGE0_HOST}/submissions?base64_encoded=false&wait=true`,
-        { source_code: code, language_id: languageId },
-        { headers: { "Content-Type": "application/json" } }
-      );
+  `https://${JUDGE0_HOST}/submissions?base64_encoded=false&wait=true`,
+  { source_code: code, language_id: languageId },
+  {
+    headers: {
+      "Content-Type": "application/json",
+      "x-rapidapi-key": process.env.RAPID_API_KEY,
+      "x-rapidapi-host": JUDGE0_HOST,
+    },
+  }
+);
+
 
       const result = response.data;
 

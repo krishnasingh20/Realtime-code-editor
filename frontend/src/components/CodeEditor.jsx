@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import Editor from "@monaco-editor/react";
 import { socket } from "../socket";
@@ -10,6 +10,15 @@ const languageTemplates = {
   java: `public class Main {\n    public static void main(String[] args) {\n        // Start coding...\n    }\n}`,
 };
 
+// Debounce function
+const debounce = (fn, delay) => {
+  let timer;
+  return (...args) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn(...args), delay);
+  };
+};
+
 const CodeEditor = ({ roomId, username }) => {
   const navigate = useNavigate();
   const [language, setLanguage] = useState("javascript");
@@ -17,6 +26,16 @@ const CodeEditor = ({ roomId, username }) => {
   const [consoleOutput, setConsoleOutput] = useState("");
   const [isRunning, setIsRunning] = useState(false);
   const [users, setUsers] = useState([]);
+
+  // Ref to track remote updates to avoid infinite loop
+  const isRemoteUpdate = useRef(false);
+
+  // Debounced function to emit code changes
+  const debouncedEmit = useRef(
+    debounce((value) => {
+      socket.emit("code-change", { roomId, code: value });
+    }, 150)
+  ).current;
 
   // Join room & set up socket listeners
   useEffect(() => {
@@ -27,15 +46,18 @@ const CodeEditor = ({ roomId, username }) => {
 
     socket.emit("join-room", { roomId, username });
 
-    // Update users list
     socket.on("all-users", (roomUsers) => setUsers(roomUsers));
-
-    // Notify when a user joins or leaves (optional)
     socket.on("user-joined", (newUser) => console.log(`${newUser.username} joined`));
     socket.on("user-left", (id) => console.log(`User left: ${id}`));
 
     // Receive code updates from others
-    socket.on("code-update", (newCode) => setCode(newCode));
+    socket.on("code-update", (newCode) => {
+      isRemoteUpdate.current = true;
+      setCode(newCode);
+      setTimeout(() => {
+        isRemoteUpdate.current = false;
+      }, 0);
+    });
 
     // Receive code execution output
     socket.on("code-output", ({ output, error, runBy }) => {
@@ -57,15 +79,17 @@ const CodeEditor = ({ roomId, username }) => {
     };
   }, [roomId, username, navigate]);
 
-  // Update editor template when language changes
+  // Update editor template when language changes **only if code is empty**
   useEffect(() => {
-    setCode(languageTemplates[language]);
+    setCode((prev) => (prev.trim() === "" ? languageTemplates[language] : prev));
   }, [language]);
 
   // Handle local code changes
   const handleCodeChange = (value) => {
     setCode(value);
-    socket.emit("code-change", { roomId, code: value });
+    if (!isRemoteUpdate.current) {
+      debouncedEmit(value);
+    }
   };
 
   // Run code
