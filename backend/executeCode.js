@@ -6,20 +6,22 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-/**
- * Executes the given code in the selected language.
- * @param {string} language - "javascript" | "python" | "cpp" | "java"
- * @param {string} code - The source code to execute.
- * @returns {Promise<{output: string, error?: string}>}
- */
 export const executeCode = (language, code) => {
   return new Promise((resolve, reject) => {
-    const tempFile = path.join(__dirname, `temp.${getFileExtension(language)}`);
+    let tempFile;
+    let className = "Main";
 
-    // ✅ Write code to temp file
+    // Handle Java separately to match class name
+    if (language === "java") {
+      const classMatch = code.match(/public\s+class\s+(\w+)/);
+      className = classMatch ? classMatch[1] : "Main";
+      tempFile = path.join(__dirname, `${className}.java`);
+    } else {
+      tempFile = path.join(__dirname, `temp.${getFileExtension(language)}`);
+    }
+
     fs.writeFileSync(tempFile, code);
 
-    // ✅ Command to run based on language
     let command;
     switch (language) {
       case "javascript":
@@ -32,26 +34,29 @@ export const executeCode = (language, code) => {
         command = `g++ ${tempFile} -o ${__dirname}/temp.exe && ${__dirname}/temp.exe`;
         break;
       case "java":
-        command = `javac ${tempFile} && java -cp ${__dirname} ${path.basename(tempFile, ".java")}`;
+        command = `javac ${tempFile} && java -cp ${__dirname} ${className}`;
         break;
       default:
         return reject(new Error("Unsupported language"));
     }
 
-    // ✅ Execute the code
     exec(command, (error, stdout, stderr) => {
-      fs.unlinkSync(tempFile); // delete temp file
+      try {
+        fs.unlinkSync(tempFile);
+        if (language === "java") {
+          const classFile = path.join(__dirname, `${className}.class`);
+          if (fs.existsSync(classFile)) fs.unlinkSync(classFile);
+        }
+      } catch {}
 
       if (error) {
-        resolve({ output: "", error: stderr || error.message });
-      } else {
-        resolve({ output: stdout });
+        return resolve({ output: "", error: stderr || error.message });
       }
+      resolve({ output: stdout });
     });
   });
 };
 
-/** Returns file extension based on language */
 function getFileExtension(language) {
   switch (language) {
     case "javascript":
