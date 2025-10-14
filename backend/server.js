@@ -51,6 +51,7 @@ io.on("connection", (socket) => {
 
     io.to(roomId).emit("all-users", rooms[roomId]);
     socket.to(roomId).emit("user-joined", { id: socket.id, username });
+
   });
 
   socket.on("leave-room", ({ roomId }) => {
@@ -67,6 +68,12 @@ io.on("connection", (socket) => {
 
   socket.on("code-change", ({ roomId, code }) => {
     socket.to(roomId).emit("code-update", code);
+  });
+
+  // 🟢 FIXED: Changed from "language-change" to "language-update"
+  socket.on("language-update", ({ roomId, language }) => {
+    socket.to(roomId).emit("language-update", { language });
+    console.log(`Language changed to ${language} in room ${roomId}`);
   });
 
   socket.on("run-code", async ({ roomId, code, language, username }) => {
