@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import Editor from "@monaco-editor/react";
 import { socket } from "../socket";
+import "../styles/Editor.css";
 
 const languageTemplates = {
   javascript: "// Start coding...",
@@ -10,7 +11,7 @@ const languageTemplates = {
   java: `public class Main {\n    public static void main(String[] args) {\n        // Start coding...\n    }\n}`,
 };
 
-// Debounce function
+// Debounce function to reduce unnecessary socket emissions
 const debounce = (fn, delay) => {
   let timer;
   return (...args) => {
@@ -22,22 +23,22 @@ const debounce = (fn, delay) => {
 const CodeEditor = ({ roomId, username }) => {
   const navigate = useNavigate();
   const [language, setLanguage] = useState("javascript");
-  const [code, setCode] = useState(languageTemplates[language]);
+  const [code, setCode] = useState(languageTemplates["javascript"]);
   const [consoleOutput, setConsoleOutput] = useState("");
   const [isRunning, setIsRunning] = useState(false);
   const [users, setUsers] = useState([]);
-
-  // Ref to track remote updates to avoid infinite loop
+  const [consoleHeight, setConsoleHeight] = useState(200);
   const isRemoteUpdate = useRef(false);
+  const isResizing = useRef(false);
+  const startY = useRef(0);
+  const startHeight = useRef(0);
 
-  // Debounced function to emit code changes
   const debouncedEmit = useRef(
     debounce((value) => {
       socket.emit("code-change", { roomId, code: value });
     }, 150)
   ).current;
 
-  // Join room & set up socket listeners
   useEffect(() => {
     if (!roomId || !username) {
       navigate("/");
@@ -50,16 +51,19 @@ const CodeEditor = ({ roomId, username }) => {
     socket.on("user-joined", (newUser) => console.log(`${newUser.username} joined`));
     socket.on("user-left", (id) => console.log(`User left: ${id}`));
 
-    // Receive code updates from others
     socket.on("code-update", (newCode) => {
       isRemoteUpdate.current = true;
       setCode(newCode);
-      setTimeout(() => {
-        isRemoteUpdate.current = false;
-      }, 0);
+      setTimeout(() => (isRemoteUpdate.current = false), 0);
     });
 
-    // Receive code execution output
+    // Receive language updates from other users
+    socket.on("language-update", ({ language: newLang }) => {
+      console.log("Received language update:", newLang);
+      setLanguage(newLang);
+      setCode(languageTemplates[newLang]);
+    });
+
     socket.on("code-output", ({ output, error, runBy }) => {
       setIsRunning(false);
       setConsoleOutput(
@@ -76,15 +80,45 @@ const CodeEditor = ({ roomId, username }) => {
       socket.off("user-left");
       socket.off("code-update");
       socket.off("code-output");
+      socket.off("language-update");
     };
   }, [roomId, username, navigate]);
 
-  // Update editor template when language changes **only if code is empty**
-  useEffect(() => {
-    setCode((prev) => (prev.trim() === "" ? languageTemplates[language] : prev));
-  }, [language]);
+  // Handle console resizing
+  const handleMouseDown = (e) => {
+    isResizing.current = true;
+    startY.current = e.clientY;
+    startHeight.current = consoleHeight;
+    document.body.style.cursor = 'ns-resize';
+    document.body.style.userSelect = 'none';
+  };
 
-  // Handle local code changes
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      if (!isResizing.current) return;
+      
+      const deltaY = startY.current - e.clientY;
+      const newHeight = Math.min(Math.max(startHeight.current + deltaY, 100), 600);
+      setConsoleHeight(newHeight);
+    };
+
+    const handleMouseUp = () => {
+      if (isResizing.current) {
+        isResizing.current = false;
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+      }
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [consoleHeight]);
+
   const handleCodeChange = (value) => {
     setCode(value);
     if (!isRemoteUpdate.current) {
@@ -92,100 +126,94 @@ const CodeEditor = ({ roomId, username }) => {
     }
   };
 
-  // Run code
+  // Handle language change with synchronization
+  const handleLanguageChange = (e) => {
+    const newLang = e.target.value;
+    setLanguage(newLang);
+    setCode(languageTemplates[newLang]); // Update code template for the user who changed it
+    // Emit language change to other users in the room
+    socket.emit("language-update", { roomId, language: newLang });
+    console.log("Language sent:", newLang);
+  };
+
   const runCode = () => {
     setIsRunning(true);
     setConsoleOutput("⏳ Running code...");
     socket.emit("run-code", { roomId, code, language, username });
   };
 
-  // Leave room
   const leaveRoom = () => {
     socket.emit("leave-room", { roomId });
     navigate("/");
   };
 
   return (
-    <div className="container-fluid py-3">
-      {/* Header */}
-      <div className="d-flex align-items-center justify-content-between bg-primary text-white rounded px-3 py-2 mb-3">
-        <h5>Collaborative Code Editor</h5>
-        <span className="badge bg-light text-dark">Room ID: {roomId}</span>
-        <div className="d-flex align-items-center gap-2">
-          <div>👤 {username}</div>
-          <button className="btn btn-danger btn-sm" onClick={leaveRoom}>
+    <div className="editor-container">
+      {/* ===== HEADER ===== */}
+      <div className="editor-header">
+        <div className="title">💻 Collaborative Code Editor</div>
+        <div className="room-id">Room ID: {roomId}</div>
+        <div>
+          👤 {username}
+          <button className="leave-btn" onClick={leaveRoom}>
             🚪 Leave Room
           </button>
         </div>
       </div>
 
-      <div className="row g-3">
-        {/* Sidebar */}
-        <div className="col-md-3">
-          <div className="card shadow-sm">
-            <div className="card-header">👥 Users ({users.length})</div>
-            <ul className="list-group list-group-flush">
-              {users.map((u) => (
-                <li key={u.id} className="list-group-item">
-                  🟢 {u.username}
-                </li>
-              ))}
-            </ul>
-          </div>
+      {/* ===== TOOLBAR ===== */}
+      <div className="editor-toolbar">
+        <select
+          className="language-selector"
+          value={language}
+          onChange={handleLanguageChange}
+        >
+          <option value="javascript">JavaScript</option>
+          <option value="python">Python</option>
+          <option value="cpp">C++</option>
+          <option value="java">Java</option>
+        </select>
+        <button className="run-btn" onClick={runCode} disabled={isRunning}>
+          {isRunning ? "Running..." : "▶ Run"}
+        </button>
+      </div>
+
+      {/* ===== MAIN SECTION ===== */}
+      <div className="main-content">
+        {/* Users list */}
+        <div className="user-list">
+          <h3>Users ({users.length})</h3>
+          {users.map((u) => (
+            <div key={u.id} className="user">
+              <div className="status"></div>
+              <span>{u.username}</span>
+            </div>
+          ))}
         </div>
 
-        {/* Main Editor */}
-        <div className="col-md-9">
-          <div className="d-flex mb-2 gap-2">
-            <select
-              className="form-select w-auto"
-              value={language}
-              onChange={(e) => setLanguage(e.target.value)}
-            >
-              <option value="javascript">JavaScript</option>
-              <option value="python">Python</option>
-              <option value="cpp">C++</option>
-              <option value="java">Java</option>
-            </select>
-            <button
-              className="btn btn-success"
-              onClick={runCode}
-              disabled={isRunning}
-            >
-              {isRunning ? "Running..." : "▶ Run"}
-            </button>
+        {/* Editor and console */}
+        <div className="editor-section">
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+            <Editor
+              height="100%"
+              language={language}
+              theme="vs-dark"
+              value={code}
+              onChange={handleCodeChange}
+              options={{
+                fontSize: 14,
+                minimap: { enabled: false },
+                automaticLayout: true,
+                suggestOnTriggerCharacters: true,
+              }}
+            />
           </div>
-
-          <Editor
-            height="50vh"
-            language={language}
-            theme="vs-dark"
-            value={code}
-            onChange={handleCodeChange}
-            options={{
-              fontSize: 14,
-              minimap: { enabled: false },
-              automaticLayout: true,
-              suggestOnTriggerCharacters: true,
-            }}
-          />
-
-          {/* Console Output */}
-          <div className="card mt-3 shadow-sm">
-            <div className="card-header">Console Output</div>
-            <div className="card-body">
-              <pre
-                style={{
-                  background: "#0b0f14",
-                  color: "#a8f0c6",
-                  padding: "10px",
-                  borderRadius: "5px",
-                  height: "25vh",
-                  overflowY: "auto",
-                }}
-              >
-                {consoleOutput || "Run your code to see output..."}
-              </pre>
+          <div className="resize-handle" onMouseDown={handleMouseDown}>
+            <div className="resize-bar"></div>
+          </div>
+          <div className="console-container" style={{ height: `${consoleHeight}px`, flexShrink: 0 }}>
+            <div className="console-output">
+              {consoleOutput || "Run your code to see output..."}
             </div>
           </div>
         </div>
