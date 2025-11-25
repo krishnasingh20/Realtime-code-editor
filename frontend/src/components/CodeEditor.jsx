@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Editor from "@monaco-editor/react";
 import { socket } from "../socket";
+import ChatPanel from "./ChatPanel";
 import { formatCode, getFormattingMessage } from "../utils/codeFormatter";
 import { 
   emitCodeChange, 
@@ -390,6 +391,8 @@ const CodeEditor = ({ roomId, username }) => {
         </div>
       </div>
 
+
+
       {/* Toolbar */}
       <div className="editor-toolbar">
         <div className="toolbar-left">
@@ -467,6 +470,9 @@ const CodeEditor = ({ roomId, username }) => {
             </button>
           </div>
         </div>
+        {/* ========= MODERN CHAT PANEL ========= */}
+        <ChatPanel roomId={roomId} username={username} />
+
 
         {/* Editor Section */}
         <div className="editor-section">
@@ -525,7 +531,9 @@ const CodeEditor = ({ roomId, username }) => {
         </div>
       </div>
     </div>
+    
   );
 };
+
 
 export default CodeEditor;

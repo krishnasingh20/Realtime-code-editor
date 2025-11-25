@@ -4,15 +4,17 @@ import { Server } from "socket.io";
 import cors from "cors";
 import dotenv from "dotenv";
 import judge0Client from "./utils/judge0Client.js";
-
+import { executeCode } from "./executeCode.js";
+import OpenAI from "openai";
 dotenv.config();
+
 
 const app = express();
 const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:5173",
+    origin: ["http://localhost:5173", "http://localhost:5174"],
     methods: ["GET", "POST"],
   },
   pingTimeout: 60000,
@@ -119,6 +121,27 @@ io.on("connection", (socket) => {
   // Run code with rate limit handling
   socket.on("run-code", async ({ roomId, code, language, username, input }) => {
     try {
+      const useLocal = process.env.USE_LOCAL_EXECUTION === "true";
+      
+      if (useLocal) {
+        // Use local execution
+        io.to(roomId).emit("code-output", {
+          output: `⏳ Executing code locally...`,
+          error: false,
+          runBy: username,
+        });
+
+        const result = await executeCode(language, code);
+        
+        io.to(roomId).emit("code-output", {
+          output: result.output || result.error || "⚠ No output",
+          error: !!result.error,
+          runBy: username,
+        });
+        return;
+      }
+
+      // Try Judge0 API (requires RAPID_API_KEY)
       const languageId = languageMap[language];
       if (!languageId) {
         io.to(roomId).emit("code-output", {
@@ -127,6 +150,10 @@ io.on("connection", (socket) => {
           runBy: username,
         });
         return;
+      }
+
+      if (!process.env.RAPID_API_KEY || process.env.RAPID_API_KEY === "your_judge0_api_key_here") {
+        throw new Error("Judge0 API key not configured. Set USE_LOCAL_EXECUTION=true in .env to use local execution.");
       }
 
       // Auto-wrap Java
@@ -168,9 +195,11 @@ int main() {
         runBy: username,
       });
     } catch (error) {
-      console.error("Judge0 API Error:", error.response?.data || error.message);
+      console.error("Code execution error:", error.message);
       
-      const errorMsg = error.response?.status === 429 
+      const errorMsg = error.message.includes("API key")
+        ? error.message
+        : error.response?.status === 429
         ? "⚠ API rate limit exceeded. Please try again in a moment."
         : "⚠ Code execution failed. Try again later.";
       
@@ -187,6 +216,46 @@ int main() {
     const status = judge0Client.getQueueStatus();
     socket.emit("queue-status", status);
   });
+  // CHAT
+socket.on("chatMessage", ({ roomId, username, message, timestamp }) => {
+  io.to(roomId).emit("chatMessage", {
+    username,
+    message,
+    timestamp: timestamp || new Date(),
+    isAI: false
+  });
+});
+
+// TYPING INDICATOR
+socket.on("user:typing", ({ roomId, username, isTyping }) => {
+  socket.to(roomId).emit("user:typing", {
+    username,
+    isTyping
+  });
+});
+
+// AI
+
+
+const ai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+socket.on("askAI", async ({ roomId, username, prompt }) => {
+  try {
+    const res = await ai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [{ role: "user", content: prompt }],
+    });
+
+    const reply = res.choices[0].message.content;
+    io.to(roomId).emit("aiResponse", reply);
+  } catch (e) {
+    console.error("AI Error:", e.message);
+    io.to(roomId).emit("aiResponse", "Error with AI! Please check your API key.");
+  }
+});
+
 
   socket.on("disconnect", () => {
     console.log("User disconnected:", socket.id);
