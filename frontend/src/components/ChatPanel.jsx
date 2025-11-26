@@ -10,6 +10,7 @@ const ChatPanel = ({ roomId, username, isOpen, setIsOpen }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
   const textareaRef = useRef(null);
@@ -34,6 +35,13 @@ const ChatPanel = ({ roomId, username, isOpen, setIsOpen }) => {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Reset unread count when chat is opened
+  useEffect(() => {
+    if (isOpen) {
+      setUnreadCount(0);
+    }
+  }, [isOpen]);
 
   // Auto-expand textarea
   const autoExpandTextarea = () => {
@@ -63,6 +71,11 @@ const ChatPanel = ({ roomId, username, isOpen, setIsOpen }) => {
         },
       ]);
       setTypingUsers((prev) => prev.filter((u) => u !== msgUsername));
+      
+      // Increment unread count if chat is closed
+      if (!isOpen && msgUsername !== username) {
+        setUnreadCount((prev) => prev + 1);
+      }
     };
 
     const handleAIResponse = (reply) => {
@@ -78,6 +91,11 @@ const ChatPanel = ({ roomId, username, isOpen, setIsOpen }) => {
         },
       ]);
       setIsLoading(false);
+      
+      // Increment unread count if chat is closed
+      if (!isOpen) {
+        setUnreadCount((prev) => prev + 1);
+      }
     };
 
     const handleUserTyping = ({ username: typingUsername, isTyping: typing }) => {
@@ -99,7 +117,7 @@ const ChatPanel = ({ roomId, username, isOpen, setIsOpen }) => {
       socket.off("aiResponse", handleAIResponse);
       socket.off("user:typing", handleUserTyping);
     };
-  }, [socket, username]);
+  }, [socket, username, isOpen]);
 
   const handleSendMessage = () => {
     const message = inputValue.trim();
@@ -182,30 +200,38 @@ const ChatPanel = ({ roomId, username, isOpen, setIsOpen }) => {
 
   return (
     <div className={`chat-panel ${isOpen ? "open" : "closed"}`}>
-      {/* Header - Always Visible */}
-      <div className={`chat-panel-header ${!isOpen ? 'closed' : ''}`}>
-        <div className="chat-title-section">
-          {isOpen && (
-            <>
+      {/* Toggle Button - Always Visible */}
+      <button
+        className={`chat-toggle-btn ${isOpen ? "open" : ""}`}
+        onClick={() => setIsOpen(!isOpen)}
+        title={isOpen ? "Close chat" : "Open chat"}
+        aria-label={isOpen ? "Close chat panel" : "Open chat panel"}
+      >
+        {isOpen ? (
+          <span className="toggle-icon close-icon">✕</span>
+        ) : (
+          <>
+            <span className="toggle-icon chat-icon">💬</span>
+            {unreadCount > 0 && (
+              <span className="unread-badge">{unreadCount > 99 ? "99+" : unreadCount}</span>
+            )}
+          </>
+        )}
+      </button>
+
+      {/* Chat Content - Only When Open */}
+      {isOpen && (
+        <>
+          {/* Header */}
+          <div className="chat-panel-header">
+            <div className="chat-title-section">
               <span className="chat-icon">💬</span>
               <h3>Live Chat</h3>
               <span className="chat-badge">{messages.length}</span>
-            </>
-          )}
-        </div>
-        <button
-          className="action-btn close-btn"
-          onClick={() => setIsOpen(!isOpen)}
-          title={isOpen ? "Hide chat" : "Show chat"}
-          aria-label={isOpen ? "Hide chat panel" : "Show chat panel"}
-        >
-          {isOpen ? "✕" : "💬"}
-        </button>
-      </div>
+            </div>
+          </div>
 
-      {/* Messages Container - Only When Open */}
-      {isOpen && (
-        <>
+          {/* Messages Container */}
           <div className="chat-messages-container">
             {messages.length === 0 ? (
               <div className="chat-empty-state">

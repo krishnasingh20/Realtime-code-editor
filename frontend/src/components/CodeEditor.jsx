@@ -32,7 +32,7 @@ import {
 } from "../utils/cursorTracker";
 import { useCollaboration } from "../hooks/useCollaboration";
 import ConsoleManager from "../components/ConsoleManager";
-import CursorOverlay from "../components/CursorOverlay";
+import CursorOverlay from "./CursorOverlay";
 import AccessRequestNotification from "../components/AccessRequestNotification";
 import "../styles/Editor.css";
 
@@ -360,6 +360,10 @@ const CodeEditor = ({ roomId, username }) => {
           <span>{notificationMessage}</span>
         </div>
       )}
+
+      {/* Access Request Notifications - Only shows when there are pending requests */}
+      <AccessRequestNotification roomId={roomId} />
+
 
       {/* Floating Chat Toggle Button */}
       {!isChatOpen && (
