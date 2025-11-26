@@ -10,6 +10,7 @@ const ChatPanel = ({ roomId, username }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [isOpen, setIsOpen] = useState(true);
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
   const textareaRef = useRef(null);
@@ -181,134 +182,146 @@ const ChatPanel = ({ roomId, username }) => {
   };
 
   return (
-    <div className="chat-panel">
+    <div className={`chat-panel ${isOpen ? "open" : "closed"}`}>
       {/* Header */}
       <div className="chat-panel-header">
         <div className="chat-title-section">
           <span className="chat-icon">💬</span>
           <h3>Live Chat</h3>
           <span className="chat-badge">{messages.length}</span>
+          <button
+            className="action-btn close-btn"
+            onClick={() => setIsOpen(!isOpen)}
+            title={isOpen ? "Hide chat" : "Show chat"}
+            aria-label={isOpen ? "Hide chat panel" : "Show chat panel"}
+          >
+            {isOpen ? "✕" : "💬"}
+          </button>
         </div>
       </div>
 
       {/* Messages Container */}
-      <div className="chat-messages-container">
-        {messages.length === 0 ? (
-          <div className="chat-empty-state">
-            <span className="empty-icon">👋</span>
-            <p>Start the conversation!</p>
-          </div>
-        ) : (
-          messages.map((msg) => (
-            <div
-              key={msg.id}
-              className={`chat-message ${msg.isOwn ? "own" : ""} ${
-                msg.isAI ? "ai" : ""
-              }`}
-            >
-              <div className="message-avatar">
-                {msg.isAI ? (
-                  <span className="ai-avatar">🤖</span>
-                ) : (
-                  <span className="user-avatar">
-                    {msg.username.charAt(0).toUpperCase()}
-                  </span>
-                )}
+      {isOpen && (
+        <>
+          <div className="chat-messages-container">
+            {messages.length === 0 ? (
+              <div className="chat-empty-state">
+                <span className="empty-icon">👋</span>
+                <p>Start the conversation!</p>
               </div>
-              <div className="message-content">
-                <div className="message-header">
-                  <span className="message-username">{msg.username}</span>
-                  <span className="message-time">{formatTime(msg.timestamp)}</span>
+            ) : (
+              messages.map((msg) => (
+                <div
+                  key={msg.id}
+                  className={`chat-message ${msg.isOwn ? "own" : ""} ${
+                    msg.isAI ? "ai" : ""
+                  }`}
+                >
+                  <div className="message-avatar">
+                    {msg.isAI ? (
+                      <span className="ai-avatar">🤖</span>
+                    ) : (
+                      <span className="user-avatar">
+                        {msg.username.charAt(0).toUpperCase()}
+                      </span>
+                    )}
+                  </div>
+                  <div className="message-content">
+                    <div className="message-header">
+                      <span className="message-username">{msg.username}</span>
+                      <span className="message-time">{formatTime(msg.timestamp)}</span>
+                    </div>
+                    <div className="message-text">{msg.message}</div>
+                  </div>
                 </div>
-                <div className="message-text">{msg.message}</div>
+              ))
+            )}
+
+            {/* Typing Indicator */}
+            {typingUsers.length > 0 && (
+              <div className="typing-indicator">
+                <span className="typing-avatar">✏️</span>
+                <span className="typing-text">
+                  {typingUsers.join(", ")} {typingUsers.length === 1 ? "is" : "are"}{" "}
+                  typing
+                </span>
+                <div className="typing-dots">
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                </div>
+              </div>
+            )}
+
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* Input Area */}
+          <div className="chat-input-area">
+            <div className="chat-input-wrapper">
+              <div className="input-actions">
+                <button
+                  className="action-btn emoji-btn"
+                  onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                  title="Add emoji"
+                  aria-label="Add emoji"
+                >
+                  😊
+                </button>
+              </div>
+
+              <textarea
+                ref={textareaRef}
+                className="chat-input"
+                value={inputValue}
+                onChange={handleInputChange}
+                onKeyPress={handleKeyPress}
+                placeholder={isMobile ? "Message..." : "Type a message... (Shift+Enter for new line)"}
+                rows="1"
+                disabled={isLoading}
+                style={{ overflow: "hidden" }}
+              />
+
+              <div className="input-buttons">
+                <button
+                  className="action-btn send-btn"
+                  onClick={handleSendMessage}
+                  disabled={!inputValue.trim() || isLoading}
+                  title="Send message"
+                  aria-label="Send message"
+                >
+                  ✈️
+                </button>
+                <button
+                  className="action-btn ai-btn"
+                  onClick={handleAskAI}
+                  disabled={!inputValue.trim() || isLoading}
+                  title="Ask AI Assistant"
+                  aria-label="Ask AI Assistant"
+                >
+                  {isLoading ? "⏳" : "🤖"}
+                </button>
               </div>
             </div>
-          ))
-        )}
 
-        {/* Typing Indicator */}
-        {typingUsers.length > 0 && (
-          <div className="typing-indicator">
-            <span className="typing-avatar">✏️</span>
-            <span className="typing-text">
-              {typingUsers.join(", ")} {typingUsers.length === 1 ? "is" : "are"}{" "}
-              typing
-            </span>
-            <div className="typing-dots">
-              <span></span>
-              <span></span>
-              <span></span>
-            </div>
+            {/* Emoji Picker */}
+            {showEmojiPicker && (
+              <div className="emoji-picker">
+                {emojis.map((emoji) => (
+                  <button
+                    key={emoji}
+                    className="emoji-btn"
+                    onClick={() => addEmoji(emoji)}
+                    type="button"
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
-        )}
-
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* Input Area */}
-      <div className="chat-input-area">
-        <div className="chat-input-wrapper">
-          <div className="input-actions">
-            <button
-              className="action-btn emoji-btn"
-              onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-              title="Add emoji"
-              aria-label="Add emoji"
-            >
-              😊
-            </button>
-          </div>
-
-          <textarea
-            ref={textareaRef}
-            className="chat-input"
-            value={inputValue}
-            onChange={handleInputChange}
-            onKeyPress={handleKeyPress}
-            placeholder={isMobile ? "Message..." : "Type a message... (Shift+Enter for new line)"}
-            rows="1"
-            disabled={isLoading}
-            style={{ overflow: "hidden" }}
-          />
-
-          <div className="input-buttons">
-            <button
-              className="action-btn send-btn"
-              onClick={handleSendMessage}
-              disabled={!inputValue.trim() || isLoading}
-              title="Send message"
-              aria-label="Send message"
-            >
-              ✈️
-            </button>
-            <button
-              className="action-btn ai-btn"
-              onClick={handleAskAI}
-              disabled={!inputValue.trim() || isLoading}
-              title="Ask AI Assistant"
-              aria-label="Ask AI Assistant"
-            >
-              {isLoading ? "⏳" : "🤖"}
-            </button>
-          </div>
-        </div>
-
-        {/* Emoji Picker */}
-        {showEmojiPicker && (
-          <div className="emoji-picker">
-            {emojis.map((emoji) => (
-              <button
-                key={emoji}
-                className="emoji-btn"
-                onClick={() => addEmoji(emoji)}
-                type="button"
-              >
-                {emoji}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
+        </>
+      )}
     </div>
   );
 };
