@@ -537,7 +537,7 @@ const CodeEditor = ({ roomId, username }) => {
             <span>Chars: {code.length}</span>
           </span>
         </div>
-        <div className="status-right">
+        <div className="status-right"> 
           <span className="status-item">
             <span className="status-icon">🔒</span>
             <span>Encrypted</span>
