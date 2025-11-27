@@ -18,7 +18,9 @@ import {
   onInputVisibilityChange,
   onOutputVisibilityChange,
   emitInputChange,
-  onInputChange
+  onInputChange,
+  emitClearOutput,
+  onClearOutput
 } from "../utils/socketHandler";
 import { 
   languageTemplates, 
@@ -35,6 +37,13 @@ import ConsoleManager from "../components/ConsoleManager";
 import CursorOverlay from "./CursorOverlay";
 import AccessRequestNotification from "../components/AccessRequestNotification";
 import "../styles/Editor.css";
+
+const CURSOR_TIMEOUT = 15000;
+const SYNC_TIMEOUT = 500;
+const DEBOUNCE_CODE = 300;
+const DEBOUNCE_CONSOLE = 200;
+const DEBOUNCE_INPUT = 200;
+const THROTTLE_CURSOR = 150;
 
 const debounce = (fn, delay) => {
   let timer;
@@ -61,18 +70,18 @@ const CodeEditor = ({ roomId, username }) => {
     setIsConsoleVisible,
     isOutputOpen,
     setIsOutputOpen,
+    isInputOpen,
+    setIsInputOpen,
     isRemoteUpdate,
   } = useCollaboration(socket, roomId, username);
 
   const [input, setInput] = useState("");
-  const [isInputOpen, setIsInputOpen] = useState(true);
   const [consoleHeight, setConsoleHeight] = useState(300);
   const [remoteCursors, setRemoteCursors] = useState({});
   const [showNotification, setShowNotification] = useState(false);
   const [notificationMessage, setNotificationMessage] = useState("");
   const [syncStatus, setSyncStatus] = useState("connected");
-  const [lastSaveTime, setLastSaveTime] = useState(new Date());
-  const [isChatOpen, setIsChatOpen] = useState(true);
+  const [isChatOpen, setIsChatOpen] = useState(false);
   
   const editorRef = useRef(null);
   const isResizing = useRef(false);
@@ -85,11 +94,10 @@ const CodeEditor = ({ roomId, username }) => {
     debounce((value) => {
       if (!isRemoteUpdate.current) {
         emitCodeChange(socket, roomId, value);
-        setLastSaveTime(new Date());
         setSyncStatus("syncing");
-        setTimeout(() => setSyncStatus("connected"), 500);
+        setTimeout(() => setSyncStatus("connected"), SYNC_TIMEOUT);
       }
-    }, 300)
+    }, DEBOUNCE_CODE)
   ).current;
 
   const debouncedConsoleHeight = useRef(
@@ -97,7 +105,7 @@ const CodeEditor = ({ roomId, username }) => {
       if (!isRemoteConsoleUpdate.current) {
         emitConsoleHeight(socket, roomId, height);
       }
-    }, 200)
+    }, DEBOUNCE_CONSOLE)
   ).current;
 
   const debouncedInputEmit = useRef(
@@ -105,26 +113,15 @@ const CodeEditor = ({ roomId, username }) => {
       if (!isRemoteInputUpdate.current) {
         emitInputChange(socket, roomId, value);
       }
-    }, 200)
+    }, DEBOUNCE_INPUT)
   ).current;
 
-  // Show notification
   const showToast = (message) => {
     setNotificationMessage(message);
     setShowNotification(true);
     setTimeout(() => setShowNotification(false), 3000);
   };
 
-  // Monitor user changes
-  useEffect(() => {
-    const prevUserCount = users.length;
-    if (users.length > prevUserCount) {
-      const newUser = users[users.length - 1];
-      showToast(`${newUser.username} joined the session`);
-    }
-  }, [users]);
-
-  // Handle console resizing
   const handleMouseDown = (e) => {
     isResizing.current = true;
     startY.current = e.clientY;
@@ -159,7 +156,6 @@ const CodeEditor = ({ roomId, username }) => {
     };
   }, [consoleHeight, debouncedConsoleHeight]);
 
-  // Listen for all console changes
   useEffect(() => {
     if (!socket) return;
 
@@ -190,7 +186,15 @@ const CodeEditor = ({ roomId, username }) => {
         isRemoteInputUpdate.current = false;
       });
     });
-  }, [socket]);
+
+    onClearOutput(socket, () => {
+      setConsoleOutput("");
+    });
+
+    return () => {
+      socket.off("console:clear-output");
+    };
+  }, [socket, setIsConsoleVisible, setIsInputOpen, setIsOutputOpen]);
 
   const handleCodeChange = (value) => {
     setCode(value);
@@ -217,7 +221,7 @@ const CodeEditor = ({ roomId, username }) => {
       if (position && position.lineNumber && position.column) {
         emitCursorPosition(socket, roomId, position);
       }
-    }, 100);
+    }, THROTTLE_CURSOR);
 
     editor.onDidChangeCursorPosition((e) => {
       if (e.position) {
@@ -230,14 +234,13 @@ const CodeEditor = ({ roomId, username }) => {
     if (!socket) return;
 
     const cursorTimeouts = new Map();
-    const CURSOR_TIMEOUT = 8000;
 
-    const cleanup = setupCursorListener(socket, ({ userId, username: remoteUsername, position }) => {
-      if (!userId || userId === socket.id || remoteUsername === username) {
-        return;
-      }
-
-      if (!position || !position.lineNumber || !position.column) {
+    const handleCursorUpdate = ({ userId, username: remoteUsername, position }) => {
+      if (!userId || !position) return;
+      if (userId === socket.id) return;
+      if (remoteUsername === username) return;
+      if (!position.lineNumber || !position.column || 
+          position.lineNumber < 1 || position.column < 1) {
         return;
       }
 
@@ -266,12 +269,15 @@ const CodeEditor = ({ roomId, username }) => {
       }, CURSOR_TIMEOUT);
 
       cursorTimeouts.set(userId, timeout);
-    });
+    };
+
+    const unsubscribe = setupCursorListener(socket, handleCursorUpdate);
 
     return () => {
-      cleanup();
+      if (unsubscribe) unsubscribe();
       cursorTimeouts.forEach((timeout) => clearTimeout(timeout));
       cursorTimeouts.clear();
+      setRemoteCursors({});
     };
   }, [socket, username]);
 
@@ -287,7 +293,7 @@ const CodeEditor = ({ roomId, username }) => {
     const formatted = formatCode(code, language);
     setCode(formatted);
     emitCodeChange(socket, roomId, formatted);
-    showToast("Code formatted successfully!");
+    showToast("Code formatted");
     
     const originalOutput = consoleOutput;
     setConsoleOutput(getFormattingMessage(language));
@@ -298,9 +304,9 @@ const CodeEditor = ({ roomId, username }) => {
 
   const handleRunCode = () => {
     setIsRunning(true);
-    setConsoleOutput("⏳ Running code...");
+    setConsoleOutput("Executing...");
     executeCode(socket, roomId, code, language, username, input);
-    showToast("Executing code...");
+    showToast("Running code");
   };
 
   const handleLeaveRoom = () => {
@@ -309,21 +315,18 @@ const CodeEditor = ({ roomId, username }) => {
   };
 
   const handleToggleConsole = () => {
-    const newState = !isConsoleVisible;
-    setIsConsoleVisible(newState);
-    emitConsoleVisibility(socket, roomId, newState);
+    setIsConsoleVisible(!isConsoleVisible);
+    emitConsoleVisibility(socket, roomId, !isConsoleVisible);
   };
 
   const handleToggleInput = () => {
-    const newState = !isInputOpen;
-    setIsInputOpen(newState);
-    emitInputVisibility(socket, roomId, newState);
+    setIsInputOpen(!isInputOpen);
+    emitInputVisibility(socket, roomId, !isInputOpen);
   };
 
   const handleToggleOutput = () => {
-    const newState = !isOutputOpen;
-    setIsOutputOpen(newState);
-    emitOutputVisibility(socket, roomId, newState);
+    setIsOutputOpen(!isOutputOpen);
+    emitOutputVisibility(socket, roomId, !isOutputOpen);
   };
 
   const handleInputChange = (value) => {
@@ -331,9 +334,14 @@ const CodeEditor = ({ roomId, username }) => {
     debouncedInputEmit(value);
   };
 
+  const handleClearOutput = () => {
+    setConsoleOutput("");
+    emitClearOutput(socket, roomId);
+  };
+
   const handleCopyRoomId = () => {
     navigator.clipboard.writeText(roomId);
-    showToast("Room ID copied to clipboard!");
+    showToast("Room ID copied!");
   };
 
   const getLanguageIcon = (lang) => {
@@ -347,13 +355,11 @@ const CodeEditor = ({ roomId, username }) => {
   };
 
   return (
-    <div className="editor-container">
-      {/* Animated Background Elements */}
+    <div className={`editor-container ${isChatOpen ? 'chat-open' : 'chat-closed'}`}>
       <div className="editor-bg-orb orb-1"></div>
       <div className="editor-bg-orb orb-2"></div>
       <div className="grid-overlay"></div>
 
-      {/* Toast Notification */}
       {showNotification && (
         <div className="toast-notification">
           <div className="toast-icon">✓</div>
@@ -361,23 +367,8 @@ const CodeEditor = ({ roomId, username }) => {
         </div>
       )}
 
-      {/* Access Request Notifications - Only shows when there are pending requests */}
       <AccessRequestNotification roomId={roomId} />
 
-
-      {/* Floating Chat Toggle Button */}
-      {!isChatOpen && (
-        <button
-          className="floating-chat-btn"
-          onClick={() => setIsChatOpen(true)}
-          title="Show chat panel"
-          aria-label="Show chat panel"
-        >
-          💬
-        </button>
-      )}
-
-      {/* Header */}
       <div className="editor-header">
         <div className="header-left">
           <div className="brand-badge">
@@ -395,7 +386,7 @@ const CodeEditor = ({ roomId, username }) => {
           <div className="sync-status">
             <span className={`sync-dot ${syncStatus}`}></span>
             <span className="sync-text">
-              {syncStatus === "connected" ? "Synced" : "Syncing..."}
+              {syncStatus === "connected" ? "Synced" : "Syncing"}
             </span>
           </div>
           <div className="user-badge">
@@ -409,9 +400,6 @@ const CodeEditor = ({ roomId, username }) => {
         </div>
       </div>
 
-
-
-      {/* Toolbar */}
       <div className="editor-toolbar">
         <div className="toolbar-left">
           <div className="language-selector-wrapper">
@@ -449,9 +437,7 @@ const CodeEditor = ({ roomId, username }) => {
         </div>
       </div>
 
-      {/* Main Content */}
       <div className="main-content">
-        {/* Sidebar - Users */}
         <div className="sidebar">
           <div className="sidebar-header">
             <span className="sidebar-icon">👥</span>
@@ -475,7 +461,6 @@ const CodeEditor = ({ roomId, username }) => {
             ))}
           </div>
 
-          {/* Quick Actions */}
           <div className="quick-actions">
             <div className="action-header">Quick Actions</div>
             <button className="action-btn" onClick={handleToggleConsole}>
@@ -488,11 +473,7 @@ const CodeEditor = ({ roomId, username }) => {
             </button>
           </div>
         </div>
-        {/* ========= MODERN CHAT PANEL ========= */}
-        <ChatPanel roomId={roomId} username={username} isOpen={isChatOpen} setIsOpen={setIsChatOpen} />
 
-
-        {/* Editor Section */}
         <div className="editor-section">
           <div className="editor-wrapper" style={{ position: 'relative' }}>
             <div className="editor-glow-border"></div>
@@ -520,12 +501,18 @@ const CodeEditor = ({ roomId, username }) => {
             isOutputOpen={isOutputOpen}
             setIsOutputOpen={handleToggleOutput}
             consoleOutput={consoleOutput}
-            setConsoleOutput={setConsoleOutput}
+            setConsoleOutput={handleClearOutput}
           />
         </div>
+
+        <ChatPanel 
+          roomId={roomId} 
+          username={username}
+          isOpen={isChatOpen}
+          setIsOpen={setIsChatOpen}
+        />
       </div>
 
-      {/* Status Bar */}
       <div className="status-bar">
         <div className="status-left">
           <span className="status-item">
@@ -537,7 +524,7 @@ const CodeEditor = ({ roomId, username }) => {
             <span>Chars: {code.length}</span>
           </span>
         </div>
-        <div className="status-right"> 
+        <div className="status-right">
           <span className="status-item">
             <span className="status-icon">🔒</span>
             <span>Encrypted</span>
@@ -549,9 +536,7 @@ const CodeEditor = ({ roomId, username }) => {
         </div>
       </div>
     </div>
-    
   );
 };
-
 
 export default CodeEditor;

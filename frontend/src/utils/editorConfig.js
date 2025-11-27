@@ -1,5 +1,3 @@
-// editorConfig.js - Monaco Editor configuration and language templates
-
 export const languageTemplates = {
   javascript: "// Start coding...",
   python: "# Start coding...",
@@ -7,9 +5,6 @@ export const languageTemplates = {
   java: `import java.util.Scanner;\n\npublic class Main {\n    public static void main(String[] args) {\n        // Start coding...\n    }\n}`,
 };
 
-/**
- * Define custom Monaco theme
- */
 export const defineCustomTheme = (monaco) => {
   monaco.editor.defineTheme('custom-dark', {
     base: 'vs-dark',
@@ -41,9 +36,6 @@ export const defineCustomTheme = (monaco) => {
   monaco.editor.setTheme('custom-dark');
 };
 
-/**
- * Monaco Editor options
- */
 export const editorOptions = {
   fontSize: 15,
   fontFamily: "'Fira Code', 'Cascadia Code', 'JetBrains Mono', monospace",

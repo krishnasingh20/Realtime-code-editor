@@ -8,42 +8,51 @@ const RemoteCursor = ({ userId, username, position, editorRef }) => {
   const updateTimeoutRef = useRef(null);
 
   useEffect(() => {
-    if (!editorRef.current || !position) {
+    if (!editorRef?.current || !position) {
       setCoords(null);
       return;
     }
 
     const updatePosition = () => {
-      // Clear any pending update
       if (updateTimeoutRef.current) {
-        clearTimeout(updateTimeoutRef.current);
+        cancelAnimationFrame(updateTimeoutRef.current);
       }
 
-      // Use requestAnimationFrame for smooth updates
       updateTimeoutRef.current = requestAnimationFrame(() => {
-        const screenCoords = getScreenCoordinates(editorRef.current, position);
-        if (screenCoords) {
-          setCoords(screenCoords);
+        try {
+          const screenCoords = getScreenCoordinates(editorRef.current, position);
+          if (screenCoords) {
+            setCoords(screenCoords);
+          }
+        } catch (error) {
+          setCoords(null);
         }
       });
     };
 
     updatePosition();
 
-    // Listen to editor events for position updates
     const editor = editorRef.current;
-    const scrollListener = editor.onDidScrollChange(updatePosition);
-    const layoutListener = editor.onDidLayoutChange(updatePosition);
-    const contentListener = editor.onDidChangeModelContent(updatePosition);
+    if (!editor) return;
 
-    return () => {
-      if (updateTimeoutRef.current) {
-        cancelAnimationFrame(updateTimeoutRef.current);
-      }
-      scrollListener.dispose();
-      layoutListener.dispose();
-      contentListener.dispose();
-    };
+    try {
+      const scrollListener = editor.onDidScrollChange?.(updatePosition);
+      const layoutListener = editor.onDidLayoutChange?.(updatePosition);
+
+      return () => {
+        if (updateTimeoutRef.current) {
+          cancelAnimationFrame(updateTimeoutRef.current);
+        }
+        scrollListener?.dispose?.();
+        layoutListener?.dispose?.();
+      };
+    } catch (error) {
+      return () => {
+        if (updateTimeoutRef.current) {
+          cancelAnimationFrame(updateTimeoutRef.current);
+        }
+      };
+    }
   }, [position, editorRef]);
 
   if (!coords) return null;

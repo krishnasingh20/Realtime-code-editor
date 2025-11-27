@@ -1,5 +1,3 @@
-// useCollaboration.js - Custom hook for managing collaboration logic with proper state sync
-
 import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
@@ -16,11 +14,11 @@ export const useCollaboration = (socket, roomId, username) => {
   const [code, setCode] = useState(languageTemplates["javascript"]);
   const [consoleOutput, setConsoleOutput] = useState("");
   const [isRunning, setIsRunning] = useState(false);
-  const [isConsoleVisible, setIsConsoleVisible] = useState(true);
-  const [isOutputOpen, setIsOutputOpen] = useState(true);
+  const [isConsoleVisible, setIsConsoleVisible] = useState(false);
+  const [isOutputOpen, setIsOutputOpen] = useState(false);
+  const [isInputOpen, setIsInputOpen] = useState(false);
   
   const isRemoteUpdate = useRef(false);
-  const hasReceivedRoomState = useRef(false); // Track if we've received initial state
 
   useEffect(() => {
     if (!roomId || !username) {
@@ -28,48 +26,39 @@ export const useCollaboration = (socket, roomId, username) => {
       return;
     }
 
-    // Join the room
     joinRoom(socket, roomId, username);
 
-    // Setup socket listeners
     const cleanup = setupSocketListeners(socket, roomId, {
-      // NEW: Handle initial room state when joining
       onRoomState: (roomState) => {
-        console.log("📥 Received room state:", roomState);
-        
-        // Mark that we've received the room state
-        hasReceivedRoomState.current = true;
         isRemoteUpdate.current = true;
         
-        // Apply the complete room state
         setLanguage(roomState.language);
         setCode(roomState.code);
         setIsConsoleVisible(roomState.isConsoleVisible);
         setIsOutputOpen(roomState.isOutputOpen);
         
-        // Reset the remote update flag after state is applied
+        if (roomState.isInputOpen !== undefined) {
+          setIsInputOpen(roomState.isInputOpen);
+        }
+        
         requestAnimationFrame(() => {
           isRemoteUpdate.current = false;
         });
-        
-        console.log("✅ Room state applied successfully");
       },
       
       onUsersUpdate: (roomUsers) => {
         setUsers(roomUsers);
-        console.log(`👥 Users in room: ${roomUsers.length}`);
       },
       
       onUserJoined: (newUser) => {
-        console.log(`✅ ${newUser.username} joined the room`);
+        // User joined notification handled in component
       },
       
       onUserLeft: (id) => {
-        console.log(`❌ User left: ${id}`);
+        // User left notification handled in component
       },
       
       onCodeUpdate: (newCode) => {
-        // Only update if it's different and we're not the one who changed it
         if (code !== newCode && !isRemoteUpdate.current) {
           isRemoteUpdate.current = true;
           setCode(newCode);
@@ -80,7 +69,6 @@ export const useCollaboration = (socket, roomId, username) => {
       },
       
       onLanguageUpdate: ({ language: newLang }) => {
-        console.log(`🔄 Language changed to: ${newLang}`);
         isRemoteUpdate.current = true;
         setLanguage(newLang);
         setCode(languageTemplates[newLang]);
@@ -93,20 +81,18 @@ export const useCollaboration = (socket, roomId, username) => {
         setIsRunning(false);
         setIsConsoleVisible(true);
         setIsOutputOpen(true);
+        
         setConsoleOutput(
           error
-            ? `❌ Error (by ${runBy}):\n${output}`
-            : `👤 ${runBy} ran the code:\n\n${output}`
+            ? `Error (by ${runBy}):\n${output}`
+            : `${runBy} ran the code:\n\n${output}`
         );
       },
     });
 
-    // Cleanup on unmount
     return () => {
-      console.log("🚪 Leaving room:", roomId);
       leaveRoom(socket, roomId);
       cleanup();
-      hasReceivedRoomState.current = false;
     };
   }, [roomId, username, navigate, socket]);
 
@@ -124,6 +110,8 @@ export const useCollaboration = (socket, roomId, username) => {
     setIsConsoleVisible,
     isOutputOpen,
     setIsOutputOpen,
+    isInputOpen,
+    setIsInputOpen,
     isRemoteUpdate,
   };
 };

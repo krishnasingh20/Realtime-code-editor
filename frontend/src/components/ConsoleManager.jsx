@@ -1,5 +1,3 @@
-// ConsoleManager.jsx - Enhanced Console with Modern Design
-
 import React, { useState, useEffect } from "react";
 
 const ConsoleManager = ({
@@ -32,7 +30,7 @@ const ConsoleManager = ({
     e.stopPropagation();
     setIsClearing(true);
     setTimeout(() => {
-      setConsoleOutput("");
+      setConsoleOutput();
       setIsClearing(false);
     }, 300);
   };
@@ -53,14 +51,12 @@ const ConsoleManager = ({
 
   return (
     <>
-      {/* Resize Handle */}
       <div className="resize-handle" onMouseDown={handleMouseDown}>
         <div className="resize-bar"></div>
         <div className="resize-hint">Drag to resize</div>
       </div>
 
       <div className="console-wrapper" style={{ height: `${consoleHeight}px` }}>
-        {/* Console Header */}
         <div className="console-main-header">
           <div className="console-header-left">
             <div className="console-main-title">
@@ -89,7 +85,6 @@ const ConsoleManager = ({
         </div>
 
         <div className="console-sections">
-          {/* Input Section */}
           <div className={`console-section ${isInputOpen ? 'open' : 'closed'}`}>
             <div
               className="console-section-header"
@@ -112,14 +107,14 @@ const ConsoleManager = ({
                   <textarea
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
-                    placeholder="Enter input here...&#10;Example:&#10;5&#10;10&#10;Hello World"
+                    placeholder="Enter input here..."
                     className="input-textarea"
                   />
                 </div>
                 <div className="input-footer">
                   <span className="input-info">
                     <span className="info-icon">💡</span>
-                    <span>Tip: Each line is treated as separate input</span>
+                    <span>Each line is treated as separate input</span>
                   </span>
                   <button 
                     className="clear-input-btn"
@@ -134,7 +129,6 @@ const ConsoleManager = ({
             )}
           </div>
 
-          {/* Output Section */}
           <div className={`console-section ${isOutputOpen ? 'open' : 'closed'}`}>
             <div
               className="console-section-header"

@@ -4,39 +4,34 @@ import { socket } from "../socket";
 import CodeEditor from "../components/CodeEditor";
 import "../styles/AccessControl.css";
 
+const APPROVAL_TIMEOUT = 120000;
+
 export default function EditorPage() {
   const { roomId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
   const username = location.state?.username;
 
-  const [accessStatus, setAccessStatus] = useState("checking"); // checking, approved, pending, rejected
+  const [accessStatus, setAccessStatus] = useState("checking");
   const [roomOwner, setRoomOwner] = useState(null);
   const [pendingMessage, setPendingMessage] = useState("");
   const [approvalTimeout, setApprovalTimeout] = useState(null);
 
-  // Redirect to home if username missing
   useEffect(() => {
     if (!username) {
       navigate("/");
-      return;
     }
   }, [username, navigate]);
 
-  // Check room access on mount
   useEffect(() => {
     if (!username || !roomId) return;
 
-    // Request room access from server
     checkRoomAccess();
 
-    // Set 2-minute timeout for approval request
     const timeout = setTimeout(() => {
-      if (accessStatus === "pending") {
-        setAccessStatus("rejected");
-        setPendingMessage("⏱️ Request timed out. Please try again.");
-      }
-    }, 120000); // 2 minutes
+      setAccessStatus("rejected");
+      setPendingMessage("Request timed out. Please try again.");
+    }, APPROVAL_TIMEOUT);
 
     setApprovalTimeout(timeout);
 
@@ -45,90 +40,72 @@ export default function EditorPage() {
     };
   }, [username, roomId]);
 
-  // Setup socket listeners for access control
   useEffect(() => {
     if (!socket || !username || !roomId) return;
 
-    // Listen for access approval
-    socket.on("access-approved", ({ roomId: approvedRoomId }) => {
+    const handleAccessApproved = ({ roomId: approvedRoomId }) => {
       if (approvedRoomId === roomId) {
         setAccessStatus("approved");
-        setPendingMessage("✅ Access granted!");
+        setPendingMessage("Access granted!");
         if (approvalTimeout) clearTimeout(approvalTimeout);
       }
-    });
+    };
 
-    // Listen for access rejection
-    socket.on("access-rejected", ({ roomId: rejectedRoomId, reason }) => {
+    const handleAccessRejected = ({ roomId: rejectedRoomId, reason }) => {
       if (rejectedRoomId === roomId) {
         setAccessStatus("rejected");
-        setPendingMessage(reason || "❌ Request was rejected by room owner.");
+        setPendingMessage(reason || "Request was rejected by room owner.");
         if (approvalTimeout) clearTimeout(approvalTimeout);
       }
-    });
+    };
 
-    // Listen for room owner info
-    socket.on("room-owner-info", ({ owner }) => {
+    const handleRoomOwnerInfo = ({ owner }) => {
       setRoomOwner(owner);
-    });
+    };
+
+    socket.on("access-approved", handleAccessApproved);
+    socket.on("access-rejected", handleAccessRejected);
+    socket.on("room-owner-info", handleRoomOwnerInfo);
 
     return () => {
-      socket.off("access-approved");
-      socket.off("access-rejected");
-      socket.off("room-owner-info");
+      socket.off("access-approved", handleAccessApproved);
+      socket.off("access-rejected", handleAccessRejected);
+      socket.off("room-owner-info", handleRoomOwnerInfo);
     };
   }, [socket, username, roomId, approvalTimeout]);
 
   const checkRoomAccess = () => {
-    // Emit request to check room access
-    socket.emit("request-room-access", { 
-      roomId, 
-      username 
-    });
-
-    // Set to pending state
+    socket.emit("request-room-access", { roomId, username });
     setAccessStatus("pending");
-    setPendingMessage("🔄 Waiting for room owner approval...");
+    setPendingMessage("Waiting for room owner approval...");
   };
 
   const handleRetryRequest = () => {
     setAccessStatus("pending");
-    setPendingMessage("🔄 Sending new request...");
+    setPendingMessage("Sending new request...");
     
-    // Clear old timeout
     if (approvalTimeout) clearTimeout(approvalTimeout);
     
-    // Set new timeout
     const timeout = setTimeout(() => {
-      if (accessStatus === "pending") {
-        setAccessStatus("rejected");
-        setPendingMessage("⏱️ Request timed out. Please try again.");
-      }
-    }, 120000);
+      setAccessStatus("rejected");
+      setPendingMessage("Request timed out. Please try again.");
+    }, APPROVAL_TIMEOUT);
     
     setApprovalTimeout(timeout);
-    
-    // Resend request
-    socket.emit("request-room-access", { 
-      roomId, 
-      username 
-    });
+    socket.emit("request-room-access", { roomId, username });
   };
 
   const handleGoHome = () => {
-    // Clean up socket listeners
     socket.off("access-approved");
     socket.off("access-rejected");
     socket.off("room-owner-info");
     navigate("/");
   };
 
-  // Redirect if not authenticated
   if (!username) {
     return null;
   }
 
-  // Show access control UI while checking
   if (accessStatus === "checking") {
     return (
       <div className="access-control-container">
@@ -141,7 +118,6 @@ export default function EditorPage() {
     );
   }
 
-  // Show pending approval UI
   if (accessStatus === "pending") {
     return (
       <div className="access-control-container">
@@ -188,7 +164,6 @@ export default function EditorPage() {
     );
   }
 
-  // Show rejection UI
   if (accessStatus === "rejected") {
     return (
       <div className="access-control-container">
@@ -223,14 +198,13 @@ export default function EditorPage() {
           </div>
 
           <p className="help-text">
-            💡 Tip: Contact the room owner directly to ask them to approve your request.
+            Tip: Contact the room owner directly to ask them to approve your request.
           </p>
         </div>
       </div>
     );
   }
 
-  // Access approved - show editor
   if (accessStatus === "approved") {
     return <CodeEditor roomId={roomId} username={username} />;
   }

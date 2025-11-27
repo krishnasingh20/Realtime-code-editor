@@ -26,8 +26,8 @@ export default function Home() {
   }, []);
 
   const handleJoin = () => {
-    if (!roomId || !username) {
-      alert("Please enter both Room ID and Username!");
+    if (!roomId.trim() || !username.trim()) {
+      alert("Please enter both Room ID and Username");
       return;
     }
     navigate(`/editor/${roomId}`, { state: { username } });
@@ -43,17 +43,15 @@ export default function Home() {
   };
 
   const handleKeyPress = (e) => {
-    if (e.key === 'Enter') {
+    if (e.key === "Enter") {
       handleJoin();
     }
   };
 
   return (
     <div className="container-fluid home-container" ref={containerRef}>
-      {/* Animated Grid Background */}
       <div className="grid-background"></div>
       
-      {/* Mouse Follower Glow */}
       <div 
         className="mouse-glow" 
         style={{
@@ -62,25 +60,18 @@ export default function Home() {
         }}
       ></div>
 
-      {/* Animated Orbs */}
       <div className="orb orb-1"></div>
       <div className="orb orb-2"></div>
       <div className="orb orb-3"></div>
       <div className="orb orb-4"></div>
       
       <div className="row w-100">
-        {/* Left Side - Feature Showcase */}
         <div className="col-md-6 d-flex justify-content-center align-items-center left-section">
           <div className="text-center feature-showcase">
-            {/* 3D Rotating Icon */}
             <div className="icon-container-3d">
               <div className="icon-ring ring-1"></div>
               <div className="icon-ring ring-2"></div>
               <div className="icon-ring ring-3"></div>
-              <div className="code-icon-3d">
-                {/* <div className="icon-front">💻</div> */}
-                {/* <div className="holographic-overlay"></div> */}
-              </div>
             </div>
             
             <h2 className="feature-title">
@@ -88,7 +79,6 @@ export default function Home() {
             </h2>
             <p className="feature-subtitle">Code together, sync instantly, build faster</p>
             
-            {/* Enhanced Feature Cards */}
             <div className="feature-cards">
               <div className="feature-card">
                 <div className="card-glow"></div>
@@ -116,7 +106,6 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Stats Counter */}
             <div className="stats-container">
               <div className="stat-item">
                 <div className="stat-number">10K+</div>
@@ -136,13 +125,10 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Right Side - Enhanced Form */}
         <div className="col-md-6 d-flex flex-column justify-content-center align-items-center right-section">
           <div className="form-card-3d">
-            {/* Animated Border */}
             <div className="card-border-animation"></div>
             
-            {/* Header with Animation */}
             <div className="text-center mb-4 header-section">
               <div className="brand-container">
                 <h1 className="brand-title-3d">
@@ -152,18 +138,16 @@ export default function Home() {
                 </h1>
               </div>
               <p className="tagline-enhanced">
-                ✨ Code, Chat and Collaborate. All in Perfect Sync.
+                Code, Chat and Collaborate. All in Perfect Sync.
               </p>
               
-              {/* Enhanced Status Badge */}
               <div className="status-badge-enhanced">
                 <span className="status-pulse"></span>
                 <span className="status-dot-enhanced"></span>
-                <span className="status-text">LIVE • 247 ONLINE</span>
+                <span className="status-text">LIVE</span>
               </div>
             </div>
 
-            {/* Input Fields with 3D Effect */}
             <div className="input-container-3d">
               <div className="input-group-enhanced">
                 <div className="input-label">Room ID</div>
@@ -197,7 +181,6 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Enhanced Join Button */}
               <button
                 onClick={handleJoin}
                 className="btn join-button-3d"
@@ -211,17 +194,14 @@ export default function Home() {
               </button>
             </div>
 
-            {/* Stylish Divider */}
             <div className="divider-3d">
               <div className="divider-line"></div>
               <span className="divider-text">OR</span>
               <div className="divider-line"></div>
             </div>
 
-            {/* Enhanced Generate Button */}
             <button
               className="btn generate-button-3d"
-              style={{ color: 'white' }}
               onClick={handleGenerateRoomId}
               disabled={isGenerating}
             >
@@ -239,7 +219,6 @@ export default function Home() {
               )}
             </button>
 
-            {/* Footer Features */}
             <div className="footer-features">
               <div className="feature-badge">
                 <span className="badge-icon">🔐</span>
@@ -255,7 +234,6 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Trust Indicators */}
             <div className="trust-bar">
               <div className="trust-item">
                 <span className="trust-check">✓</span>

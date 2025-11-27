@@ -29,48 +29,28 @@ export const setupCursorListener = (socket, callback) => {
   return () => socket.off("cursor-update");
 };
 
-// FIXED: Better coordinate calculation
 export const getScreenCoordinates = (editor, position) => {
   if (!editor || !position) return null;
   
   try {
     const { lineNumber, column } = position;
     
-    // Get the visible position of the cursor
     const coords = editor.getScrolledVisiblePosition({
       lineNumber,
       column,
     });
     
     if (!coords) return null;
-    
-    // Get editor container position
-    const editorDom = editor.getDomNode();
-    if (!editorDom) return null;
-    
-    const editorRect = editorDom.getBoundingClientRect();
-    const contentWidget = editorDom.querySelector('.monaco-editor .overflow-guard');
-    
-    if (!contentWidget) {
-      return {
-        x: coords.left,
-        y: coords.top,
-      };
-    }
-    
-    const contentRect = contentWidget.getBoundingClientRect();
-    
+
     return {
-      x: coords.left + (contentRect.left - editorRect.left),
-      y: coords.top + (contentRect.top - editorRect.top),
+      x: coords.left,
+      y: coords.top,
     };
   } catch (error) {
-    console.error('Error getting cursor coordinates:', error);
     return null;
   }
 };
 
-// FIXED: Better throttle function
 export const throttle = (func, limit) => {
   let lastRan;
   let timeout;
